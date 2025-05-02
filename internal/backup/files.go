@@ -31,6 +31,7 @@ func CopyFile(src, dst string) error {
 }
 
 func CopyDir(from, to string) error {
+	fmt.Println("copy dir", from, to)
 	from, err := filepath.Abs(from)
 	if err != nil {
 		return err
@@ -48,7 +49,6 @@ func CopyDir(from, to string) error {
 
 	// Обход исходной директории
 	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
-		fmt.Println("copy dir", path, to)
 		if err != nil {
 			return err
 		}
