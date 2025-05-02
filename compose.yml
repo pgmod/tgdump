@@ -1,0 +1,17 @@
+services:
+  tgdump:
+    container_name: tgdump
+    build: 
+      context: .
+    volumes:
+      - ./config.yml:/app/config.yml
+      - ./dumps:/app/dumps
+      - ${OTHER_FILES}:/app/files
+      # Используем volume для кеширeeования зависимостей
+      - go_cache:/gocache
+    restart: always
+
+
+
+volumes:
+  go_cache:

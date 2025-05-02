@@ -1,0 +1,28 @@
+databases:
+  - host: localhost
+    port: 5432
+    user: postgres
+    password: postgres
+    name: your_database
+    exclude:
+      - users.password
+      - users.password_hash
+
+  - host: example.com
+    port: 5432
+    user: admin
+    password: admin
+    name: eds_db
+
+directories:
+  - ./project/mysite/userdata
+  - ./project/eds_files
+
+files:
+  - ./project/mysite/main.db
+
+dump_dir: ./dumps
+
+telegram:
+  token: 1231231231:6ytrrf236ftyuf7tud32e7tf23yuft
+  chat_id: 87632567567
