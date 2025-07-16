@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -75,6 +76,7 @@ func SendFolder(token, chatID, folderPath string) error {
 		return fmt.Errorf("ошибка закрытия архива: %w", err)
 	}
 
+	log.Printf("отправка архива %s", zipPath)
 	// Отправка архива
 	err = SendFile(token, chatID, zipPath)
 	if err != nil {
@@ -88,6 +90,7 @@ func SendFolder(token, chatID, folderPath string) error {
 
 // SendFile отправляет файл в чат Telegram
 func SendFile(token, chatID, filepath string) error {
+	log.Printf("отправка файла %s", filepath)
 	bot, err := tgbotapi.NewBotAPIWithClient(token, tgbotapi.APIEndpoint, &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
