@@ -53,7 +53,12 @@ func doBackup(cfg *config.Config) {
 			log.Fatal(err)
 		}
 	}
-	defer os.RemoveAll(dumpDir)
+	defer func() {
+		err := os.RemoveAll(dumpDir)
+		if err != nil {
+			fmt.Printf("не удалось удалить директорию: %v", err)
+		}
+	}()
 	err := telegram.SendFolder(cfg.Telegram.Token, cfg.Telegram.ChatID, dumpDir)
 	if err != nil {
 		log.Fatal(err)
