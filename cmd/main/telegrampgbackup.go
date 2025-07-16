@@ -53,6 +53,7 @@ func doBackup(cfg *config.Config) {
 			log.Fatal(err)
 		}
 	}
+	defer os.RemoveAll(dumpDir)
 	err := telegram.SendFolder(cfg.Telegram.Token, cfg.Telegram.ChatID, dumpDir)
 	if err != nil {
 		log.Fatal(err)
