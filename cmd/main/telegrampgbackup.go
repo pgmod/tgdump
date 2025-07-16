@@ -26,6 +26,8 @@ func main() {
 		err := doBackup(cfg)
 		if err != nil {
 			log.Printf("ошибка при выполнении резервного копирования: %v", err)
+		} else {
+			log.Printf("резервное копирование выполнено успешно")
 		}
 	})
 
