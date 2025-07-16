@@ -22,7 +22,12 @@ func SendFolder(token, chatID, folderPath string) error {
 		return fmt.Errorf("ошибка создания архива: %w", err)
 	}
 	defer zipFile.Close()
-	defer os.Remove(zipPath)
+	defer func() {
+		err = os.Remove(zipPath)
+		if err != nil {
+			fmt.Printf("не удалось удалить файл: %v", err)
+		}
+	}()
 	zipWriter := zip.NewWriter(zipFile)
 
 	// Рекурсивное добавление файлов и папок
@@ -77,10 +82,6 @@ func SendFolder(token, chatID, folderPath string) error {
 	}
 
 	// Удаление архива
-	err = os.Remove(zipPath)
-	if err != nil {
-		return fmt.Errorf("архив отправлен, но не удалось удалить файл: %w", err)
-	}
 
 	return nil
 }
