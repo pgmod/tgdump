@@ -18,6 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg.Print()
 
 	doBackup(cfg)
 	// Создаем дампы для всех баз
@@ -50,6 +51,7 @@ func doBackup(cfg *config.Config) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println("done copy file", filepath.Join("./files", file), filepath.Join(dumpDir, filepath.Base(file)))
 	}
 	for _, dir := range cfg.Directories {
 		fmt.Println("copy dir", filepath.Join("./files", dir), filepath.Join(dumpDir, filepath.Base(dir)))
@@ -57,6 +59,7 @@ func doBackup(cfg *config.Config) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println("done copy dir", filepath.Join("./files", dir), filepath.Join(dumpDir, filepath.Base(dir)))
 	}
 	defer func() {
 		err := os.RemoveAll(dumpDir)

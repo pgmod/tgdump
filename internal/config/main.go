@@ -30,6 +30,26 @@ type Config struct {
 	DumpDir string `yaml:"dump_dir"`
 }
 
+func (c *Config) Print() {
+	fmt.Println("Databases:")
+	for _, db := range c.Databases {
+		fmt.Printf("  - %s\n", db.DBName)
+	}
+	fmt.Println("Directories:")
+	for _, dir := range c.Directories {
+		fmt.Printf("  - %s\n", dir)
+	}
+	fmt.Println("Files:")
+	for _, file := range c.Files {
+		fmt.Printf("  - %s\n", file)
+	}
+	fmt.Println("Telegram:")
+	// fmt.Printf("  - Token: %s\n", c.Telegram.Token)
+	fmt.Printf("  - ChatID: %s\n", c.Telegram.ChatID)
+	fmt.Println("DumpDir:")
+	fmt.Printf("  - %s\n", c.DumpDir)
+}
+
 func Read() (*Config, error) {
 	cfg := Config{}
 
