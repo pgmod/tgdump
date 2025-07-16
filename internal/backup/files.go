@@ -1,7 +1,6 @@
 package backup
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,7 +30,6 @@ func CopyFile(src, dst string) error {
 }
 
 func CopyDir(from, to string) error {
-	fmt.Println("copy dir", from, to)
 	from, err := filepath.Abs(from)
 	if err != nil {
 		return err
