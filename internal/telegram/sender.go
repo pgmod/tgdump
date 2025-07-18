@@ -29,6 +29,8 @@ func SendFolder(token, chatID, folderPath string) error {
 			fmt.Printf("не удалось удалить файл: %v", err)
 		}
 	}()
+
+	log.Printf("создание архива %s", zipPath)
 	zipWriter := zip.NewWriter(zipFile)
 
 	// Рекурсивное добавление файлов и папок
@@ -75,6 +77,14 @@ func SendFolder(token, chatID, folderPath string) error {
 	if err != nil {
 		return fmt.Errorf("ошибка закрытия архива: %w", err)
 	}
+
+	// подсчет размера архива
+	zipInfo, err := os.Stat(zipPath)
+	if err != nil {
+		return fmt.Errorf("ошибка получения информации о файле: %w", err)
+	}
+	zipSize := zipInfo.Size()
+	log.Printf("размер архива: %d bytes", zipSize)
 
 	log.Printf("отправка архива %s", zipPath)
 	// Отправка архива
