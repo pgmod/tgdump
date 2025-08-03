@@ -188,7 +188,7 @@ func SendFileWithProgress(token string, chatID int64, filePath string) error {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: false, // осторожно: только если точно нужно
+				InsecureSkipVerify: true, // осторожно: только если точно нужно
 			},
 		},
 	}
