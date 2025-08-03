@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"time"
 )
 
 func SendFolder(token, chatID, folderPath string) error {
@@ -101,38 +101,109 @@ func SendFolder(token, chatID, folderPath string) error {
 // SendFile отправляет файл в чат Telegram
 func SendFile(token, chatID, filepath string) error {
 	log.Printf("отправка файла %s", filepath)
-	bot, err := tgbotapi.NewBotAPIWithClient(token, tgbotapi.APIEndpoint, &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("ошибка создания Telegram-бота: %w", err)
-	}
-
-	file, err := os.Open(filepath)
-	if err != nil {
-		return fmt.Errorf("не удалось открыть файл: %w", err)
-	}
-	defer file.Close()
 
 	chat, err := strconv.ParseInt(chatID, 10, 64)
 	if err != nil {
 		return fmt.Errorf("ошибка конвертации chatID: %w", err)
 	}
 
-	doc := tgbotapi.NewDocument(chat, tgbotapi.FileReader{
-		Name:   filepath,
-		Reader: file,
-		// Size:   -1, // Telegram сам определит
-	})
-
-	_, err = bot.Send(doc)
+	err = SendFileWithProgress(token, chat, filepath)
 	if err != nil {
 		return fmt.Errorf("ошибка отправки файла: %w", err)
 	}
 
+	return nil
+}
+
+type ProgressReader struct {
+	io.Reader
+	Total      int64
+	ReadSoFar  int64
+	LastUpdate time.Time
+}
+
+func (pr *ProgressReader) Read(p []byte) (int, error) {
+	n, err := pr.Reader.Read(p)
+	pr.ReadSoFar += int64(n)
+
+	// Показываем прогресс не чаще раза в 300 мс
+	if time.Since(pr.LastUpdate) > 300*time.Millisecond || pr.ReadSoFar == pr.Total {
+		percent := float64(pr.ReadSoFar) / float64(pr.Total) * 100
+		log.Printf("Прогресс загрузки: %.2f%%", percent)
+		pr.LastUpdate = time.Now()
+	}
+
+	return n, err
+}
+
+func SendFileWithProgress(token string, chatID int64, filePath string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("не удалось открыть файл: %w", err)
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("не удалось получить информацию о файле: %w", err)
+	}
+
+	pr := &ProgressReader{
+		Reader: file,
+		Total:  fileInfo.Size(),
+	}
+
+	// Создаём io.Pipe для записи и чтения
+	bodyReader, bodyWriter := io.Pipe()
+	multipartWriter := multipart.NewWriter(bodyWriter)
+
+	// Пишем тело в фоне
+	go func() {
+		defer bodyWriter.Close()
+		defer multipartWriter.Close()
+
+		// Добавляем поле chat_id
+		_ = multipartWriter.WriteField("chat_id", strconv.FormatInt(chatID, 10))
+
+		// Добавляем файл
+		part, err := multipartWriter.CreateFormFile("document", filepath.Base(filePath))
+		if err != nil {
+			bodyWriter.CloseWithError(err)
+			return
+		}
+
+		_, err = io.Copy(part, pr) // Здесь будет вызываться ProgressReader
+		if err != nil {
+			bodyWriter.CloseWithError(err)
+			return
+		}
+	}()
+
+	req, err := http.NewRequest("POST", "https://api.telegram.org/bot"+token+"/sendDocument", bodyReader)
+	if err != nil {
+		return fmt.Errorf("не удалось создать запрос: %w", err)
+	}
+	req.Header.Set("Content-Type", multipartWriter.FormDataContentType())
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: false, // осторожно: только если точно нужно
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("ошибка отправки запроса: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("ошибка ответа Telegram: %s", string(respBody))
+	}
+
+	log.Println("Файл успешно отправлен.")
 	return nil
 }

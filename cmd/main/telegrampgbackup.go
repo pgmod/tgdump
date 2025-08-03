@@ -20,7 +20,10 @@ func main() {
 	}
 	cfg.Print()
 
-	doBackup(cfg)
+	err = doBackup(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 	// Создаем дампы для всех баз
 
 	scheduler.ScheduleDailyAt("08:00", func() {
