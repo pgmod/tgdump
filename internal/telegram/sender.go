@@ -1,113 +1,108 @@
 package telegram
 
 import (
-	"archive/zip"
 	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+
+	"tgdump/internal/archive"
 )
 
-func SendFolder(token, chatID, folderPath string) error {
-	zipPath := folderPath + ".zip"
+const maxTelegramMessageLen = 4096
 
-	// Создание zip архива
-	zipFile, err := os.Create(zipPath)
-	if err != nil {
-		return fmt.Errorf("ошибка создания архива: %w", err)
+// SendMessage отправляет текстовое сообщение в чат Telegram.
+func SendMessage(token, chatID, text string) error {
+	if len(text) > maxTelegramMessageLen {
+		text = text[:maxTelegramMessageLen-3] + "..."
 	}
-	defer zipFile.Close()
-	defer func() {
-		err = os.Remove(zipPath)
-		if err != nil {
-			fmt.Printf("не удалось удалить файл: %v", err)
-		}
-	}()
 
-	log.Printf("создание архива %s", zipPath)
-	zipWriter := zip.NewWriter(zipFile)
+	form := url.Values{
+		"chat_id": {chatID},
+		"text":    {text},
+	}
 
-	// Рекурсивное добавление файлов и папок
-	err = filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("ошибка обхода %s: %w", path, err)
-		}
-		if info.IsDir() {
-			return nil // пропускаем директории, сами они не нужны в zip
-		}
-
-		// Открытие файла
-		file, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("ошибка открытия файла %s: %w", path, err)
-		}
-		defer file.Close()
-
-		// Относительный путь в архиве
-		relPath, err := filepath.Rel(folderPath, path)
-		if err != nil {
-			return fmt.Errorf("ошибка вычисления относительного пути: %w", err)
-		}
-
-		zipEntry, err := zipWriter.Create(relPath)
-		if err != nil {
-			return fmt.Errorf("ошибка создания zip-записи для %s: %w", path, err)
-		}
-
-		_, err = io.Copy(zipEntry, file)
-		if err != nil {
-			return fmt.Errorf("ошибка записи файла %s в архив: %w", path, err)
-		}
-
-		return nil
-	})
-
+	req, err := http.NewRequest(http.MethodPost,
+		"https://api.telegram.org/bot"+token+"/sendMessage",
+		strings.NewReader(form.Encode()))
 	if err != nil {
-		zipWriter.Close()
+		return fmt.Errorf("не удалось создать запрос: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := telegramHTTPClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("ошибка отправки запроса: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ошибка ответа Telegram: %s", string(respBody))
+	}
+	return nil
+}
+
+func telegramHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+}
+
+// SendFolder архивирует каталог и отправляет zip в Telegram.
+// keepZip: сохранить zip на диске после отправки.
+func SendFolder(token, chatID, folderPath string, keepZip bool) error {
+	log.Printf("создание архива для отправки: %s", folderPath)
+	zipPath, err := archive.ZipDirectory(folderPath)
+	if err != nil {
 		return err
 	}
-
-	err = zipWriter.Close()
-	if err != nil {
-		return fmt.Errorf("ошибка закрытия архива: %w", err)
+	if !keepZip {
+		defer func() {
+			if err := os.Remove(zipPath); err != nil {
+				log.Printf("не удалось удалить временный архив: %v", err)
+			}
+		}()
 	}
 
-	// подсчет размера архива
 	zipInfo, err := os.Stat(zipPath)
 	if err != nil {
 		return fmt.Errorf("ошибка получения информации о файле: %w", err)
 	}
-	zipSize := zipInfo.Size()
-	log.Printf("размер архива: %d bytes", zipSize)
+	log.Printf("размер архива для отправки: %d bytes", zipInfo.Size())
 
 	log.Printf("отправка архива %s", zipPath)
-	// Отправка архива
-	err = SendFile(token, chatID, zipPath)
-	if err != nil {
+	if err := SendFile(token, chatID, zipPath); err != nil {
 		return fmt.Errorf("ошибка отправки архива: %w", err)
 	}
-
-	// Удаление архива
-
+	if keepZip {
+		log.Printf("архив сохранён: %s", zipPath)
+	}
 	return nil
 }
 
-// SendFile отправляет файл в чат Telegram
-func SendFile(token, chatID, filepath string) error {
-	log.Printf("отправка файла %s", filepath)
+// SendFile отправляет файл в чат Telegram.
+func SendFile(token, chatID, filePath string) error {
+	log.Printf("отправка файла %s", filePath)
 
 	chat, err := strconv.ParseInt(chatID, 10, 64)
 	if err != nil {
 		return fmt.Errorf("ошибка конвертации chatID: %w", err)
 	}
 
-	err = SendFileWithProgress(token, chat, filepath)
+	err = SendFileWithProgress(token, chat, filePath)
 	if err != nil {
 		return fmt.Errorf("ошибка отправки файла: %w", err)
 	}
@@ -185,15 +180,7 @@ func SendFileWithProgress(token string, chatID int64, filePath string) error {
 	}
 	req.Header.Set("Content-Type", multipartWriter.FormDataContentType())
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, // осторожно: только если точно нужно
-			},
-		},
-	}
-
-	resp, err := client.Do(req)
+	resp, err := telegramHTTPClient().Do(req)
 	if err != nil {
 		return fmt.Errorf("ошибка отправки запроса: %w", err)
 	}

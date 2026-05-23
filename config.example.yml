@@ -4,6 +4,7 @@ databases:
     user: postgres
     password: postgres
     name: your_database
+    delivery: send
     exclude:
       - users.password
       - users.password_hash
@@ -13,15 +14,21 @@ databases:
     user: admin
     password: admin
     name: eds_db
+    delivery: save
 
 directories:
   - ./project/mysite/userdata
-  - ./project/eds_files
+  - path: ./project/eds_files
+    delivery: send
 
 files:
   - ./project/mysite/main.db
+  - path: ./project/config.ini
+    delivery: save
 
 dump_dir: ./dumps
+files_dir: ./files
+schedule: "08:00"
 
 telegram:
   token: 1231231231:6ytrrf236ftyuf7tud32e7tf23yuft
