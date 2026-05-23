@@ -23,7 +23,7 @@ FROM debian:bookworm-slim
 WORKDIR /app
 # Устанавливаем postgresql-client (включает pg_dump)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends postgresql-client-15 && \
+    apt-get install -y --no-install-recommends postgresql-client-18 && \
     rm -rf /var/lib/apt/lists/*
 
 # Копируем бинарник из стадии сборки
