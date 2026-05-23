@@ -20,6 +20,9 @@ go build -ldflags="-w -s" -o /telegrampgbackup ./cmd/main/
 # Финальный образ
 FROM debian:bookworm-slim
 
+# Отключаем интерактивные диалоги apt
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /app
 
 # Устанавливаем официальный репозиторий PostgreSQL и клиент версии 16
@@ -27,13 +30,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     gnupg && \
-    # Добавляем ключ и репозиторий
+    # Исправленный URL для скачивания официального PGP-ключа
     curl -fsSL https://postgresql.org | gpg --dearmor -o /usr/share/keyrings/postgresql-archive-keyring.gpg && \
+    # Добавляем корректный репозиторий apt.postgresql.org
     echo "deb [signed-by=/usr/share/keyrings/postgresql-archive-keyring.gpg] http://postgresql.org bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
-    # Обновляем списки и устанавливаем нужный клиент
+    # Обновляем списки пакетов репозитория PostgreSQL и устанавливаем клиент
     apt-get update && \
     apt-get install -y --no-install-recommends postgresql-client-16 && \
-    # Удаляем утилиты сборки и очищаем кэш для уменьшения размера образа
+    # Очищаем кэш и удаляем временные утилиты
     apt-get purge -y --auto-remove curl ca-certificates gnupg && \
     rm -rf /var/lib/apt/lists/*
 
